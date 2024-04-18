@@ -27,7 +27,7 @@ def preprocess_config(config, args, unknown_args):
         for k, v in inplace_dict.items():
             if isinstance(v, (dict, DictConfig)):
                 expanduser(v)
-            elif isinstance(v, str) and k[0] == '~':
+            elif isinstance(v, str) and v[0] == '~':
                 inplace_dict[k] = os.path.expanduser(v)
 
     # set unknown args to config

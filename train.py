@@ -1,6 +1,8 @@
+import os 
 import itertools
 import argparse
 from omegaconf import OmegaConf
+from omegaconf.dictconfig import DictConfig
 
 import torch
 import lightning.pytorch as pl
@@ -20,6 +22,13 @@ def preprocess_config(config, args, unknown_args):
         for key in keys[:-1]:
             inplace_dict = inplace_dict[key]
         inplace_dict[keys[-1]] = value
+    
+    def expanduser(inplace_dict):
+        for k, v in inplace_dict.items():
+            if isinstance(v, (dict, DictConfig)):
+                expanduser(v)
+            elif isinstance(v, str) and k[0] == '~':
+                inplace_dict[k] = os.path.expanduser(v)
 
     # set unknown args to config
     for k, v in itertools.pairwise(unknown_args):
@@ -54,6 +63,9 @@ def preprocess_config(config, args, unknown_args):
     if real_bs != total_bs:
         logger.warn(f'real batch size is {real_bs}')
     config.dataloader.batch_size = bs_per_device
+
+    # expand all ~ in config to user home path
+    expanduser(config)
 
     return config
 

@@ -1,0 +1,5 @@
+dataset:
+  target: src.datasets.my_dataset.MyDataset
+
+  # kwargs:
+  root_dir: ~/data/data

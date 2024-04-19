@@ -1,11 +1,15 @@
 seed: 42
+dataset_name: my_dataset
+
 
 model:
-  target: src.models.model.Model
+  target: src.models.vanilla.VanillaModel
   model_kwargs:
 
   training_kwargs:
     lr: 1e-4
+    warmup_steps: 1000
+
 
 trainer:
   target: lightning.pytorch.trainer.Trainer
@@ -20,11 +24,6 @@ trainer:
     name: 
   num_sanity_val_steps: 2
 
-dataset:
-  target: src.datasets.dataset.MyDataset
-
-  # kwargs:
-  root_dir: ~/data/data
 
 dataloader:
   batch_size: 32

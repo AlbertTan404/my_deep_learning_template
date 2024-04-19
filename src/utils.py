@@ -1,3 +1,4 @@
+import copy
 import logging
 import importlib
 from datetime import datetime
@@ -37,17 +38,16 @@ def get_obj_from_str(string, reload=False):
 def instantiate_from_config(config, extra_kwargs=dict()):
     config_dict = dict(config)
     if not "target" in config_dict:
-        if config_dict == '__is_first_stage__':
-            return None
-        elif config_dict == "__is_unconditional__":
-            return None
-        raise KeyError("Expected key `target` to instantiate.")
-    target_kwargs = dict(config_dict.get('kwargs', dict()))
+        raise ValueError(f'target not found in {config}')
+
+    target_kwargs = copy.deepcopy(config_dict)
+    target_kwargs.pop('target')
 
     for k, v in target_kwargs.items():
         if isinstance(v, DictConfig) and 'target' in v.keys():
             target_kwargs[k] = instantiate_from_config(v)
     target_kwargs.update(extra_kwargs)
+
     return get_obj_from_str(config_dict["target"])(**target_kwargs)
 
 

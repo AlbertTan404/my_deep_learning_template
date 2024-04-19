@@ -16,19 +16,27 @@ def get_train_val_loader(config):
     raise NotImplementedError
 
 
-def preprocess_config(config, args, unknown_args):
+def preprocess_config(model_config, args, unknown_args):
     def set_nested_value(inplace_dict, key_path, value):
         keys = key_path.split('.')
         for key in keys[:-1]:
             inplace_dict = inplace_dict[key]
         inplace_dict[keys[-1]] = value
-    
+
     def expanduser(inplace_dict):
         for k, v in inplace_dict.items():
             if isinstance(v, (dict, DictConfig)):
                 expanduser(v)
             elif isinstance(v, str) and v[0] == '~':
                 inplace_dict[k] = os.path.expanduser(v)
+
+    # merge dataset config
+    if args.dataset:
+        model_config.dataset = args.dataset
+
+    dataset_config = OmegaConf.load(f'src/configs/datasets/{model_config.dataset}.yaml')
+    OmegaConf.resolve(dataset_config)
+    config = OmegaConf.merge(model_config, dataset_config)
 
     # set unknown args to config
     for k, v in itertools.pairwise(unknown_args):
@@ -37,12 +45,6 @@ def preprocess_config(config, args, unknown_args):
         except:
             pass
         set_nested_value(config, k, v)
-
-    # set project signature
-    dataset_name = args.dataset_name
-    project_name = config.model.target.split('.')[-2] + '_logs'
-    config.trainer.logger.project = project_name
-    config.trainer.logger.name = f'{get_timestamp()}-{dataset_name}'
 
     # devices
     devices = args.devices
@@ -54,6 +56,11 @@ def preprocess_config(config, args, unknown_args):
     if len(config.trainer.devices) > device_count:
         config.trainer.devices = list(range(device_count))
         logger.warn(f'using {device_count} devices')
+
+    # set project name and signature for logging
+    project_name = config.model.target.split('.')[-2] + '_logs'
+    config.trainer.logger.project = project_name
+    config.trainer.logger.name = f'{get_timestamp()}-{config.dataset}'
 
     # batch size for ddp
     total_bs = config.dataloader.batch_size
@@ -72,7 +79,7 @@ def preprocess_config(config, args, unknown_args):
 
 def get_processed_args_and_config():
     args, unknown_args = get_args()
-    raw_config = OmegaConf.load(f'src/configs/{args.config_name}.yaml')
+    raw_config = OmegaConf.load(f'src/configs/models/{args.model}.yaml')
     OmegaConf.resolve(raw_config)
     config = preprocess_config(raw_config, args, unknown_args)
     return args, config
@@ -83,8 +90,13 @@ def get_args():
 
     # config
     parser.add_argument(
-        '--config_name',
-        default=''
+        '--model',
+        default='vanilla'
+    )
+
+    parser.add_argument(
+        '--dataset',
+        default='my_dataset'
     )
 
     # training

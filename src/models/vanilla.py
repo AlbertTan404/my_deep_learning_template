@@ -9,7 +9,7 @@ from diffusers.optimization import get_cosine_schedule_with_warmup
 import lightning.pytorch as pl
 
 
-class Model(pl.LightningModule):
+class VanillaModel(pl.LightningModule):
     def __init__(
         self,
         model_kwargs,

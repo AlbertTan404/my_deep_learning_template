@@ -72,7 +72,9 @@ def preprocess_config(model_config, args, unknown_args):
     config.dataloader.batch_size = bs_per_device
 
     # expand all ~ in config to user home path
-    expanduser(config)
+    # DO NOT expand here to avoid ckpt saving absolute path
+    # expand when neccesary
+    # expanduser(config)
 
     return config
 
@@ -114,12 +116,12 @@ def main():
     args, config = get_processed_args_and_config()
     pl.seed_everything(config.seed)
 
-    model = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
-
     train_loader, val_loader = get_train_val_loader(config)
 
     epoch_length = len(train_loader) // len(config.trainer.devices)
     config.model.training_kwargs['num_training_steps'] = epoch_length * config.trainer.max_epochs
+
+    model = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
 
     trainer = instantiate_from_config(config.trainer)
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)

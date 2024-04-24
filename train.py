@@ -43,7 +43,15 @@ def preprocess_config(model_config, args, unknown_args):
         try:
             v = int(v)
         except:
-            pass
+            try:
+                v = float(v)
+            except:
+                # v = bool(v) is not supported as bool('False') -> True hahaha
+                if v.lower() == 'true':
+                    v = True
+                elif v.lower() == 'false':
+                    v = False
+                # else v = v, the str itself
         set_nested_value(config, k, v)
 
     # devices
@@ -70,6 +78,12 @@ def preprocess_config(model_config, args, unknown_args):
     if real_bs != total_bs:
         logger.warn(f'real batch size is {real_bs}')
     config.dataloader.batch_size = bs_per_device
+
+    # link training config and dataset config
+    epoch_scaling = config.dataset.get('epoch_scaling')
+    if epoch_scaling is not None or epoch_scaling != 1:
+        config.trainer.max_epochs = int(config.trainer.max_epochs / epoch_scaling)
+        logger.info(f'Epoch length is scaled by {epoch_scaling}, thus the num of epochs is decreased to {config.trainer.max_epochs}')
 
     # expand all ~ in config to user home path
     # DO NOT expand here to avoid ckpt saving absolute path

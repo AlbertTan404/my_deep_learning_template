@@ -2,4 +2,6 @@ dataset:
   target: src.datasets.my_dataset.MyDataset
 
   # kwargs:
-  root_dir: ~/data/data
+  dataset_dir: ~/data/data
+  epoch_scaling: 1
+  split: 

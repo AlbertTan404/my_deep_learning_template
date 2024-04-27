@@ -1,6 +1,4 @@
 seed: 42
-dataset_name: my_dataset
-
 
 model:
   target: src.models.vanilla.VanillaModel
@@ -8,6 +6,7 @@ model:
 
   training_kwargs:
     lr: 1e-4
+    scheduler: cosine_schedule_with_warmup
     warmup_steps: 1000
 
 

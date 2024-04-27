@@ -1,3 +1,4 @@
+import sys
 import copy
 import logging
 import importlib
@@ -59,3 +60,7 @@ def dict_apply(x, func):
         else:
             result[key] = func(value)
     return result
+
+
+def is_debug_mode():
+    return hasattr(sys, 'gettrace') and sys.gettrace() is not None

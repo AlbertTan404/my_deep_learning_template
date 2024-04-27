@@ -6,7 +6,7 @@ from omegaconf.dictconfig import DictConfig
 
 import torch
 import lightning.pytorch as pl
-from src.utils import instantiate_from_config, get_timestamp, setup_logger
+from src.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode
 
 
 logger = setup_logger(__name__)
@@ -58,9 +58,13 @@ def preprocess_config(config, args, unknown_args):
         logger.warn(f'using {device_count} devices')
 
     # set project name and signature for logging
-    project_name = config.model.target.split('.')[-1] + '_logs'
-    config.trainer.logger.project = project_name
-    config.trainer.logger.name = f'{get_timestamp()}-{config.dataset.target.split('.')[-1]}'
+    if args.no_wandb or is_debug_mode():
+        # don't debug with wandb to upload garbages
+        config.trainer.pop('logger')
+    else:
+        project_name = config.model.target.split('.')[-1] + '_logs'
+        config.trainer.logger.project = project_name
+        config.trainer.logger.name = f'{get_timestamp()}-{config.dataset.target.split(".")[-1]}'
 
     # batch size for ddp
     total_bs = config.dataloader.batch_size
@@ -120,6 +124,11 @@ def get_args():
         '--devices',
         type=str,
         default='1',
+    )
+
+    parser.add_argument(
+        '--no_wandb',
+        action='store_true'
     )
 
     args, unknown_args = parser.parse_known_args()

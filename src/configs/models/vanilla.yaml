@@ -17,11 +17,12 @@ trainer:
   max_steps: -1
   check_val_every_n_epoch: 1
   log_every_n_steps: 10
-  logger:
-    target: lightning.pytorch.loggers.wandb.WandbLogger
-    project: 
-    name: 
   num_sanity_val_steps: 2
+  logger:
+    target: lightning.pytorch.loggers.TensorBoardLogger
+    save_dir:
+    name:
+    version:
 
 
 dataloader:

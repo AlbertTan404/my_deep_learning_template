@@ -58,13 +58,13 @@ def preprocess_config(config, args, unknown_args):
         logger.warn(f'using {device_count} devices')
 
     # set project name and signature for logging
-    if args.no_wandb or is_debug_mode():
+    if args.no_log or is_debug_mode():
         # don't debug with wandb to upload garbages
         config.trainer.pop('logger')
     else:
-        project_name = config.model.target.split('.')[-1] + '_logs'
-        config.trainer.logger.project = project_name
-        config.trainer.logger.name = f'{get_timestamp()}-{config.dataset.target.split(".")[-1]}'
+        config.trainer.logger.save_dir = f'logs/{config.model.target.split(".")[-1]}'
+        config.trainer.logger.name = f'{config.dataset.target.split(".")[-1]}'
+        config.trainer.logger.version = get_timestamp()
 
     # batch size for ddp
     total_bs = config.dataloader.batch_size
@@ -127,7 +127,7 @@ def get_args():
     )
 
     parser.add_argument(
-        '--no_wandb',
+        '--no_log',
         action='store_true'
     )
 

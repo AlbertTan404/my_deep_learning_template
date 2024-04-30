@@ -77,7 +77,7 @@ def preprocess_config(config, args, unknown_args):
 
     # link training config and dataset config
     epoch_scaling = config.dataset.get('epoch_scaling')
-    if epoch_scaling is not None or epoch_scaling != 1:
+    if epoch_scaling is not None and epoch_scaling != 1:
         config.trainer.max_epochs = int(config.trainer.max_epochs / epoch_scaling)
         logger.info(f'Epoch length is scaled by {epoch_scaling}, thus the num of epochs is decreased to {config.trainer.max_epochs}')
 

@@ -3,7 +3,7 @@ import itertools
 import shutil
 import argparse
 from omegaconf import OmegaConf, DictConfig, ListConfig
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 import lightning.pytorch as pl
 
 from src.utils.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode
@@ -13,17 +13,22 @@ logger = setup_logger(__name__)
 
 
 def get_train_val_loader(config):
-    train_loaders = []
-    val_loaders = []
+    if len(config.dataset) > 1:
+        train_ds_list = []
+        val_ds_list = []
+        for dataset_config in config.dataset:
+            train_ds_list.append(instantiate_from_config(dataset_config, extra_kwargs={'split': 'train'}))
+            val_ds_list.append(instantiate_from_config(dataset_config, extra_kwargs={'split': 'val'}))
+        train_ds = ConcatDataset(train_ds_list)
+        val_ds = ConcatDataset(val_ds_list)
+    else:
+        train_ds = instantiate_from_config(config.dataset[0], extra_kwargs={'split': 'train'})
+        val_ds = instantiate_from_config(config.dataset[0], extra_kwargs={'split': 'val'})
 
-    for dataset_config in config.dataset:
-        train_dataset = instantiate_from_config(dataset_config, extra_kwargs={'split': 'train'})
-        train_loaders.append(DataLoader(train_dataset, **config.dataloader))
+    train_dataloader = DataLoader(train_ds, **config.dataloader)
+    val_dataloader = DataLoader(val_ds, **config.dataloader)
 
-        val_dataset = instantiate_from_config(dataset_config, extra_kwargs={'split': 'val'})
-        val_loaders.append(DataLoader(val_dataset, **config.dataloader))
-
-    return train_loaders, val_loaders
+    return train_dataloader, val_dataloader
 
 
 def _preprocess_config(config, args, unknown_args):
@@ -172,9 +177,9 @@ def main():
     args, config = get_processed_args_and_config()
     pl.seed_everything(config.seed)
 
-    train_loaders, val_loaders = get_train_val_loader(config)
+    train_loader, val_loader = get_train_val_loader(config)
 
-    epoch_length = sum(len(loader) for loader in train_loaders) // len(config.trainer.devices)
+    epoch_length = len(train_loader) // len(config.trainer.devices)
     config.model.training_kwargs['num_training_steps'] = epoch_length * config.trainer.max_epochs
 
     model = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
@@ -182,12 +187,13 @@ def main():
     trainer = instantiate_from_config(config.trainer)
 
     try:
-        trainer.fit(model=model, train_dataloaders=train_loaders, val_dataloaders=val_loaders)
+        trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
     except Exception as e:
         raise e
     else:
         # mark log dir as trained
         shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
+        # print(os.path.join(trainer.logger.log_dir + '_trained', 'checkpoints', trainer.ckpt_path.split('/')[-1]))
 
 
 if __name__ == '__main__':

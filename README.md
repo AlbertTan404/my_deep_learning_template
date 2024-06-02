@@ -18,4 +18,6 @@ python train.py --model=vanilla --dataset=my_dataset1,my_dataset2 --devices=0,1,
 
 ## Inference/Evaluation
 
+```
 python eval.py --model_dir=logs/vanilla/my_dataset/yyyymmdd-hhmmss_suffix_trained
+```

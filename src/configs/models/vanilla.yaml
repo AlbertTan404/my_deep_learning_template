@@ -3,6 +3,7 @@ seed: 42
 model:
   target: src.models.vanilla.VanillaModel
   model_kwargs:
+    hidden_size: 768
 
   training_kwargs:
     lr: 1e-4

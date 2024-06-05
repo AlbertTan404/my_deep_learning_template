@@ -50,8 +50,8 @@ def _preprocess_config(config, args, unknown_args):
         inplace_dict[keys[-1]] = value
 
     # set unknown args to config
-    for i in range(0, len(unknown_args), 2):
-        k, v = unknown_args[i], unknown_args[i+1]
+    for unknown in unknown_args:
+        k, v = unknown.split('=')
         try:
             v = int(v)  # maybe int has the highest priority
         except:

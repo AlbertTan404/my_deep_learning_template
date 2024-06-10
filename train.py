@@ -33,9 +33,32 @@ def get_train_val_loader(config):
 
 def _preprocess_config(config, args, unknown_args):
 
+    def bfs_set_config_key_value(inplace_dict, key, value):
+        if key in inplace_dict.keys():
+            inplace_dict[key] = value
+            return True
+
+        for v in inplace_dict.values():
+            res = False
+            if isinstance(v, (DictConfig, dict)):
+                res = bfs_set_config_key_value(inplace_dict=v, key=key, value=value)
+            elif isinstance(v, list):
+                for item in v:
+                    res = bfs_set_config_key_value(inplace_dict=item, key=key, value=value)
+            if res:
+                return True
+        
+        return False
+
     def set_config_key_value(inplace_dict, key_path, value):
         keys = key_path.split('.')  # dataset.a.b = 1
         len_keys = len(keys)
+        if len_keys == 1:
+            res = bfs_set_config_key_value(inplace_dict, key=key_path, value=value)
+            if res:
+                return
+            else:
+                raise ValueError(f'{key_path} is not found in config')
 
         for key_idx in range(len_keys - 1):  # 
             inplace_dict = inplace_dict[keys[key_idx]]

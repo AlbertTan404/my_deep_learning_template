@@ -10,8 +10,18 @@ model:
     scheduler: cosine_schedule_with_warmup
     warmup_steps: 1000
 
+trainer:
+  max_epochs: 1000
+
 dataloader:
   batch_size: 32
   num_workers: 32
   pin_memory: True
   persistent_workers: True
+
+callbacks:
+  - target: lightning.pytorch.callbacks
+    save_last: True
+    save_top_k: 5
+    mode: 
+    monitor: 

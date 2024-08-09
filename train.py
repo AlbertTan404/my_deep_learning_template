@@ -1,9 +1,13 @@
 import os
 import itertools
+from typing import List
 import shutil
 import argparse
+import lightning.pytorch
+import lightning.pytorch.callbacks
 from omegaconf import OmegaConf, DictConfig, ListConfig
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import DataLoader
+import lightning
 import lightning.pytorch as pl
 
 from src.utils.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode
@@ -12,21 +16,21 @@ from src.utils.utils import instantiate_from_config, get_timestamp, setup_logger
 logger = setup_logger(__name__)
 
 
-def get_train_val_loader(config):
-    if len(config.dataset) > 1:
-        train_ds_list = []
-        val_ds_list = []
-        for dataset_config in config.dataset:
-            train_ds_list.append(instantiate_from_config(dataset_config, extra_kwargs={'split': 'train'}))
-            val_ds_list.append(instantiate_from_config(dataset_config, extra_kwargs={'split': 'val'}))
-        train_ds = ConcatDataset(train_ds_list)
-        val_ds = ConcatDataset(val_ds_list)
-    else:
-        train_ds = instantiate_from_config(config.dataset[0], extra_kwargs={'split': 'train'})
-        val_ds = instantiate_from_config(config.dataset[0], extra_kwargs={'split': 'val'})
+def instantiate_callbacks(callback_configs: ListConfig):
+    callbacks = []
+    for callback_cfg in callback_configs:
+        callbacks.append(instantiate_from_config(callback_cfg))
+    
+    return callbacks
 
-    train_dataloader = DataLoader(train_ds, **config.dataloader)
-    val_dataloader = DataLoader(val_ds, **config.dataloader)
+
+def get_train_val_dataloader(config):
+
+    train_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'train'})
+    val_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'val'})
+
+    train_dataloader = DataLoader(train_ds, **config.dataloader, shuffle=True)
+    val_dataloader = DataLoader(val_ds, **config.dataloader, shuffle=False)
 
     return train_dataloader, val_dataloader
 
@@ -42,7 +46,7 @@ def _preprocess_config(config, args, unknown_args):
             res = False
             if isinstance(v, (DictConfig, dict)):
                 res = bfs_set_config_key_value(inplace_dict=v, key=key, value=value)
-            elif isinstance(v, list):
+            elif isinstance(v, ListConfig):
                 for item in v:
                     res = bfs_set_config_key_value(inplace_dict=item, key=key, value=value)
             if res:
@@ -81,11 +85,13 @@ def _preprocess_config(config, args, unknown_args):
             try:
                 v = float(v)
             except:
-                # v = bool(v) is not supported as bool('False') -> True hahaha
-                if v.lower() == 'true':
+                # v = bool(v) is not supported as bool('False') -> True
+                if (vlower := v.lower()) == 'true':
                     v = True
-                elif v.lower() == 'false':
+                elif vlower == 'false':
                     v = False
+                elif vlower == 'none':
+                    v = None
                 # else v = v, the str itself
         set_config_key_value(config, k, v)
 
@@ -112,7 +118,7 @@ def _preprocess_config(config, args, unknown_args):
     config.dataloader.batch_size = bs_per_device
 
     # epoch scaling
-    epoch_scaling = config.dataset[0].get('epoch_scaling')
+    epoch_scaling = config.dataset.get('epoch_scaling')
     if epoch_scaling is not None and epoch_scaling != 1:
         config.trainer.max_epochs = int(config.trainer.max_epochs / epoch_scaling)
         logger.info(f'Training epoch length is scaled by {epoch_scaling}, thus the num of epochs is decreased to {config.trainer.max_epochs}')
@@ -131,6 +137,8 @@ def preprocess_config_hook(config):
 def get_processed_args_and_config():
     args, unknown_args = get_args()
 
+    OmegaConf.register_new_resolver("eval", eval)
+
     # load trainer config
     trainer_config = OmegaConf.load(f'src/configs/trainer/{args.trainer}.yaml')
     OmegaConf.resolve(trainer_config)
@@ -141,13 +149,9 @@ def get_processed_args_and_config():
     config = OmegaConf.merge(trainer_config, model_config)
 
     # load dataset config
-    datasets = args.dataset.split(',')
-    datasets_config = {'dataset': []}
-    for dataset in datasets:
-        single_config = OmegaConf.load(f'src/configs/datasets/{dataset}.yaml')
-        OmegaConf.resolve(single_config)
-        datasets_config['dataset'].append(single_config['dataset'])
-    config = OmegaConf.merge(config, DictConfig(datasets_config))
+    dataset_config = OmegaConf.load(f'src/configs/datasets/{args.dataset}.yaml')
+    OmegaConf.resolve(dataset_config)
+    config = OmegaConf.merge(config, DictConfig(dataset_config))
 
     config = _preprocess_config(config, args, unknown_args)
     
@@ -157,12 +161,6 @@ def get_processed_args_and_config():
 def get_args():
     parser = argparse.ArgumentParser()
 
-    # config
-    parser.add_argument(
-        '--trainer',
-        default='default'
-    )
-
     parser.add_argument(
         '--model',
         default='vanilla'
@@ -170,10 +168,9 @@ def get_args():
 
     parser.add_argument(
         '--dataset',
-        default='my_dataset_1,my_dataset_2'
+        default='my_dataset_1'
     )
 
-    # training
     parser.add_argument(
         '--devices',
         type=str,
@@ -182,13 +179,13 @@ def get_args():
 
     parser.add_argument(
         '--no_log',
-        help='indicator for disabling training log',
+        help='disable training log',
         action='store_true'
     )
 
     parser.add_argument(
         '--log_suffix',
-        help='manually set log dir suffix',
+        help='add suffix to log dir',
         default=''
     )
 
@@ -200,23 +197,24 @@ def main():
     args, config = get_processed_args_and_config()
     pl.seed_everything(config.seed)
 
-    train_loader, val_loader = get_train_val_loader(config)
-
-    epoch_length = len(train_loader) // len(config.trainer.devices)
+    train_dataloader, val_dataloader = get_train_val_dataloader(config)
+    epoch_length = len(train_dataloader) // len(config.trainer.devices)
     config.model.training_kwargs['num_training_steps'] = epoch_length * config.trainer.max_epochs
 
-    model = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
+    model: pl.LightningModule = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
 
-    trainer = instantiate_from_config(config.trainer)
+    callbacks: List[pl.Callback] = instantiate_callbacks(config.model.callbacks)
+
+    trainer: pl.Trainer = instantiate_from_config(config.trainer, extra_kwargs={'callbacks': callbacks})
 
     try:
-        trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+        trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     except Exception as e:
         raise e
     else:
         # mark log dir as trained
-        shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
-        # print(os.path.join(trainer.logger.log_dir + '_trained', 'checkpoints', trainer.ckpt_path.split('/')[-1]))
+        if trainer.global_rank == 0:
+            shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
 
 
 if __name__ == '__main__':

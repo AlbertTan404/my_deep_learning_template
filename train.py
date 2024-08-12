@@ -1,13 +1,10 @@
 import os
-import itertools
 from typing import List
 import shutil
+import pprint
 import argparse
-import lightning.pytorch
-import lightning.pytorch.callbacks
 from omegaconf import OmegaConf, DictConfig, ListConfig
 from torch.utils.data import DataLoader
-import lightning
 import lightning.pytorch as pl
 
 from src.utils.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode
@@ -126,7 +123,7 @@ def _preprocess_config(config, args, unknown_args):
     # personal design
     config = preprocess_config_hook(config)
 
-    logger.info(f'running with config: {config}')
+    logger.info(f'running with config: {pprint.pformat(config)}')
     return config
 
 

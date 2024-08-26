@@ -6,7 +6,9 @@ model:
     hidden_size: 768
 
   training_kwargs:
-    lr: 1e-4
+    optimizer:
+      target: torch.optim.Adam
+      lr: 1e-4
     scheduler: cosine_schedule_with_warmup
     warmup_steps: 1000
 

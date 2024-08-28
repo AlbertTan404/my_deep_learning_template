@@ -20,10 +20,3 @@ dataloader:
   num_workers: 32
   pin_memory: True
   persistent_workers: True
-
-callbacks:
-  - target: lightning.pytorch.callbacks
-    save_last: True
-    save_top_k: 5
-    mode: 
-    monitor: 

@@ -1,27 +1,9 @@
 import sys
 import copy
-import logging
+import torch
 import importlib
 from datetime import datetime
 from omegaconf.dictconfig import DictConfig
-
-
-def setup_logger(name, log_file=None):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
-    logger.addHandler(console_handler)
-    if log_file:
-        logger.addHandler(file_handler)
-
-    return logger
 
 
 def get_timestamp():
@@ -60,6 +42,13 @@ def dict_apply(x, func):
         else:
             result[key] = func(value)
     return result
+
+
+def dict_to_device(data: dict, device: torch.device):
+    for k, v in data.items():
+        if isinstance(v, torch.Tensor):
+            data[k] = v.to(device)
+    return data
 
 
 def is_debug_mode():

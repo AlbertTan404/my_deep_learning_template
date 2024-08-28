@@ -6,8 +6,18 @@ trainer:
   log_every_n_steps: 10
   num_sanity_val_steps: 2
   gradient_clip_val: 0.5
+
   logger:
     target: lightning.pytorch.loggers.TensorBoardLogger
     save_dir:
     name:
     version:
+
+callbacks:
+  - target: lightning.pytorch.callbacks.ModelCheckpoint
+    save_last: True
+    save_top_k: 1
+    mode: max
+    monitor: monitor
+    auto_insert_metric_name: False
+    filename: "epoch{epoch}__step{step}__monitor{monitor:.3f}"

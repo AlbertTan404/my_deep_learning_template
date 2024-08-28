@@ -7,7 +7,7 @@ from omegaconf import OmegaConf, DictConfig, ListConfig
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 
-from src.utils.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode
+from src.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode
 
 
 logger = setup_logger(__name__)
@@ -200,9 +200,7 @@ def main():
 
     model: pl.LightningModule = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
 
-    callbacks: List[pl.Callback] = instantiate_callbacks(config.model.callbacks)
-
-    trainer: pl.Trainer = instantiate_from_config(config.trainer, extra_kwargs={'callbacks': callbacks})
+    trainer: pl.Trainer = instantiate_from_config(config.trainer, extra_kwargs={'callbacks': instantiate_callbacks(config.callbacks)})
 
     try:
         trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)

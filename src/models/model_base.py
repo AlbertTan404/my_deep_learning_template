@@ -2,7 +2,7 @@ from typing import Dict
 import lightning.pytorch as pl
 from transformers.optimization import get_cosine_schedule_with_warmup, get_constant_schedule_with_warmup
 
-from ..utils.utils import instantiate_from_config
+from ..utils import instantiate_from_config
 
 
 class ModelBase(pl.LightningModule):

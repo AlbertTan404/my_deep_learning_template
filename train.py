@@ -33,30 +33,25 @@ def get_train_val_dataloader(config):
 
 
 def _preprocess_config(config, args, unknown_args):
-
-    def bfs_set_config_key_value(inplace_dict, key, value):
-        if key in inplace_dict.keys():
-            inplace_dict[key] = value
-            return True
-
-        for v in inplace_dict.values():
-            res = False
-            if isinstance(v, (DictConfig, dict)):
-                res = bfs_set_config_key_value(inplace_dict=v, key=key, value=value)
-            elif isinstance(v, ListConfig):
-                for item in v:
-                    res = bfs_set_config_key_value(inplace_dict=item, key=key, value=value)
-            if res:
-                return True
-        
-        return False
-
     def set_config_key_value(inplace_dict, key_path, value):
+        flag = False
+        def bfs_set_config_key_value(inplace_dict, key, value):
+            nonlocal flag
+            if key in inplace_dict.keys():
+                inplace_dict[key] = value
+                flag = True
+            for v in inplace_dict.values():
+                if isinstance(v, (DictConfig, dict)):
+                    bfs_set_config_key_value(inplace_dict=v, key=key, value=value)
+                elif isinstance(v, ListConfig):
+                    for item in v:
+                        bfs_set_config_key_value(inplace_dict=item, key=key, value=value)
+        
         keys = key_path.split('.')  # dataset.a.b = 1
         len_keys = len(keys)
         if len_keys == 1:
-            res = bfs_set_config_key_value(inplace_dict, key=key_path, value=value)
-            if res:
+            bfs_set_config_key_value(inplace_dict, key=key_path, value=value)
+            if flag:
                 return
             else:
                 raise ValueError(f'{key_path} is not found in config')
@@ -160,12 +155,17 @@ def get_args():
 
     parser.add_argument(
         '--model',
-        default='vanilla'
+        default='my_model'
     )
 
     parser.add_argument(
         '--dataset',
-        default='my_dataset_1'
+        default='my_dataset'
+    )
+
+    parser.add_argument(
+        '--trainer',
+        default='default'
     )
 
     parser.add_argument(
@@ -193,6 +193,7 @@ def get_args():
 def main():
     args, config = get_processed_args_and_config()
     pl.seed_everything(config.seed)
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     train_dataloader, val_dataloader = get_train_val_dataloader(config)
     epoch_length = len(train_dataloader) // len(config.trainer.devices)

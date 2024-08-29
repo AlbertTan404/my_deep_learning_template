@@ -20,9 +20,9 @@ class DatasetBase(Dataset):
     def __len__(self):
         return self.real_length * self.epoch_scaling
 
-    def __getitem__(self, item):
-        item = item % self.real_length
-        return self.getitem(item=item)
+    def __getitem__(self, index):
+        index = index % self.real_length
+        return self.getitem(index=index)
 
-    def getitem(self, item):
+    def getitem(self, index):
         raise NotImplementedError

@@ -52,11 +52,14 @@ class ModelBase(pl.LightningModule):
         self.log_dict(log_dict, sync_dist=True, prog_bar=True)
         return log_dict['val/total_loss']
 
-    def get_log_dict(self, batch, batch_idx, split) -> Dict:
+    def test_step(self, batch, batch_idx=None) -> Dict:
         raise NotImplementedError
 
-    def extra_training_step(self, batch, batch_idx) -> Dict:
+    def get_log_dict(self, batch, split, batch_idx=None) -> Dict:
+        raise NotImplementedError
+
+    def extra_training_step(self, batch, batch_idx=None) -> Dict:
         return {}
 
-    def extra_validation_step(self, batch, batch_idx) -> Dict:
+    def extra_validation_step(self, batch, batch_idx=None) -> Dict:
         return {}

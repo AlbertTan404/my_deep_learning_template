@@ -1,9 +1,12 @@
 import sys
+from typing import Dict, Any
 import copy
-import torch
 import importlib
+from pathlib import Path
 from datetime import datetime
 from omegaconf.dictconfig import DictConfig
+import numpy as np
+import torch
 
 
 def get_timestamp():
@@ -44,12 +47,27 @@ def dict_apply(x, func):
     return result
 
 
-def dict_to_device(data: dict, device: torch.device):
-    for k, v in data.items():
+def dict_to_device(d: Dict[str, Any], device):
+    for k, v in d.items():
         if isinstance(v, torch.Tensor):
-            data[k] = v.to(device)
-    return data
+            d[k] = v.to(device=device)
+    return d
+
+
+def list_subdirs(path: Path):
+    return [d for d in path.glob('*') if not d.is_file()]
 
 
 def is_debug_mode():
     return hasattr(sys, 'gettrace') and sys.gettrace() is not None
+
+
+def get_clones(module, N):
+    return torch.nn.ModuleList([copy.deepcopy(module) for i in range(N)])
+
+
+def get_metric_statistics(values, replication_times):
+    mean = np.mean(values, axis=0)
+    std = np.std(values, axis=0)
+    conf_interval = 1.96 * std / np.sqrt(replication_times)
+    return mean, conf_interval

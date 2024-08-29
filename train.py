@@ -1,13 +1,15 @@
 import os
 from typing import List
 import shutil
-import pprint
+from collections import defaultdict
 import argparse
 from omegaconf import OmegaConf, DictConfig, ListConfig
+import numpy as np
+import torch
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 
-from src.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode
+from src.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode, get_metric_statistics
 
 
 logger = setup_logger(__name__)
@@ -21,15 +23,18 @@ def instantiate_callbacks(callback_configs: ListConfig):
     return callbacks
 
 
-def get_train_val_dataloader(config):
+def get_dataloaders(config):
 
     train_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'train'})
     val_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'val'})
+    test_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'test'})
 
     train_dataloader = DataLoader(train_ds, **config.dataloader, shuffle=True)
     val_dataloader = DataLoader(val_ds, **config.dataloader, shuffle=False)
+    test_dataloader = DataLoader(test_ds, **config.dataloader, shuffle=False)
 
-    return train_dataloader, val_dataloader
+    return train_dataloader, val_dataloader, test_dataloader
+
 
 
 def _preprocess_config(config, args, unknown_args):
@@ -118,7 +123,7 @@ def _preprocess_config(config, args, unknown_args):
     # personal design
     config = preprocess_config_hook(config)
 
-    logger.info(f'running with config: {pprint.pformat(config)}')
+    logger.info(f'running with config: {config}')
     return config
 
 
@@ -195,16 +200,34 @@ def main():
     pl.seed_everything(config.seed)
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    train_dataloader, val_dataloader = get_train_val_dataloader(config)
+    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(config)
     epoch_length = len(train_dataloader) // len(config.trainer.devices)
     config.model.training_kwargs['num_training_steps'] = epoch_length * config.trainer.max_epochs
 
     model: pl.LightningModule = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
+    if p := args.load_state_dict_path:
+        model.load_state_dict(torch.load(p, map_location='cpu')['state_dict'])
 
     trainer: pl.Trainer = instantiate_from_config(config.trainer, extra_kwargs={'callbacks': instantiate_callbacks(config.callbacks)})
 
     try:
-        trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+        trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=args.resume_ckpt_path)
+
+        # evaluation
+        final_res = defaultdict(list)
+        final_statistics = defaultdict(list)
+        for i in range(args.eval_replication_times):
+            pl.seed_everything(config.seed + i)
+            results = trainer.test(ckpt_path='best', dataloaders=test_dataloader)[0]  # the first dataloader
+
+            for k, v in results.items():
+                final_res[k].append(v)
+
+        for k, v in final_res.items():
+            final_statistics[k] = get_metric_statistics(v, replication_times=args.val_replication_times)
+
+        logger.info(f'evaluation results: {final_statistics}')
+
     except Exception as e:
         raise e
     else:

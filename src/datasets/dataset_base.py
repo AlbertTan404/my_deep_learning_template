@@ -8,10 +8,12 @@ class DatasetBase(Dataset):
         data_root,
         split='train',
         epoch_scaling=1,
+        tiny_dataset=False
     ):
         self.data_root = Path(data_root)
         self.split = split
         self.epoch_scaling = epoch_scaling
+        self.tiny_dataset = tiny_dataset  # recommended to set to ``True`` when debugging
 
     @property
     def real_length(self):

@@ -214,19 +214,8 @@ def main():
         trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=args.resume_ckpt_path)
 
         # evaluation
-        final_res = defaultdict(list)
-        final_statistics = defaultdict(list)
-        for i in range(args.eval_replication_times):
-            pl.seed_everything(config.seed + i)
-            results = trainer.test(ckpt_path='best', dataloaders=test_dataloader)[0]  # the first dataloader
-
-            for k, v in results.items():
-                final_res[k].append(v)
-
-        for k, v in final_res.items():
-            final_statistics[k] = get_metric_statistics(v, replication_times=args.val_replication_times)
-
-        logger.info(f'evaluation results: {final_statistics}')
+        results = trainer.test(ckpt_path='best', dataloaders=test_dataloader)[0]  # the first dataloader
+        logger.info(f'evaluation results: {results}')
 
     except Exception as e:
         raise e

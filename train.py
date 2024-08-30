@@ -1,15 +1,12 @@
 import os
-from typing import List
 import shutil
-from collections import defaultdict
 import argparse
 from omegaconf import OmegaConf, DictConfig, ListConfig
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 
-from src.utils import instantiate_from_config, get_timestamp, setup_logger, is_debug_mode, get_metric_statistics
+from src.utils import instantiate_from_config, get_timestamp, setup_logger
 
 
 logger = setup_logger(__name__)
@@ -98,7 +95,7 @@ def _preprocess_config(config, args, unknown_args):
         config.trainer.devices = [int(rank) for rank in devices.split(',')]
 
     # set project name and signature for logging
-    if args.no_log or is_debug_mode():
+    if args.no_log:
         config.trainer.logger = False
     else:
         config.trainer.logger.save_dir = f'logs/{args.model}'
@@ -120,7 +117,7 @@ def _preprocess_config(config, args, unknown_args):
         config.trainer.max_epochs = int(config.trainer.max_epochs / epoch_scaling)
         logger.info(f'Training epoch length is scaled by {epoch_scaling}, thus the num of epochs is decreased to {config.trainer.max_epochs}')
     
-    # personal design
+    # customize anything here
     config = preprocess_config_hook(config)
 
     logger.info(f'running with config: {config}')

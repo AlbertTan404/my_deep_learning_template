@@ -26,7 +26,9 @@ def get_dataloaders(config):
     val_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'val'})
     test_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'test'})
 
+    val_batch_size = config.dataloader.pop('val_batch_size', config.dataloader.batch_size)
     train_dataloader = DataLoader(train_ds, **config.dataloader, shuffle=True)
+    config.dataloader.batch_size = val_batch_size
     val_dataloader = DataLoader(val_ds, **config.dataloader, shuffle=False)
     test_dataloader = DataLoader(test_ds, **config.dataloader, shuffle=False)
 
@@ -208,6 +210,10 @@ def main():
     trainer: pl.Trainer = instantiate_from_config(config.trainer, extra_kwargs={'callbacks': instantiate_callbacks(config.callbacks)})
 
     try:
+        try:
+            shutil.copytree('src', os.path.join(trainer.logger.log_dir, 'src_backup'))  # backup src directory
+        except: pass
+
         trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=args.resume_ckpt_path)
 
         # evaluation

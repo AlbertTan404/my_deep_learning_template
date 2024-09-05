@@ -1,5 +1,6 @@
 import os
 import shutil
+import copy
 import argparse
 from omegaconf import OmegaConf, DictConfig, ListConfig
 import torch
@@ -21,16 +22,16 @@ def instantiate_callbacks(callback_configs: ListConfig):
 
 
 def get_dataloaders(config):
-
     train_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'train'})
     val_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'val'})
     test_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'test'})
 
-    val_batch_size = config.dataloader.pop('val_batch_size', config.dataloader.batch_size)
-    train_dataloader = DataLoader(train_ds, **config.dataloader, shuffle=True)
-    config.dataloader.batch_size = val_batch_size
-    val_dataloader = DataLoader(val_ds, **config.dataloader, shuffle=False)
-    test_dataloader = DataLoader(test_ds, **config.dataloader, shuffle=False)
+    dataloader_config = copy.copy(config.dataloader)
+    val_batch_size = dataloader_config.pop('val_batch_size', dataloader_config.batch_size)
+    train_dataloader = DataLoader(train_ds, **dataloader_config, shuffle=True, drop_last=True)
+    dataloader_config.batch_size = val_batch_size
+    val_dataloader = DataLoader(val_ds, **dataloader_config, shuffle=False, drop_last=True)
+    test_dataloader = DataLoader(test_ds, **dataloader_config, shuffle=False, drop_last=True)
 
     return train_dataloader, val_dataloader, test_dataloader
 
@@ -211,7 +212,8 @@ def main():
 
     try:
         try:
-            shutil.copytree('src', os.path.join(trainer.logger.log_dir, 'src_backup'))  # backup src directory
+            if trainer.global_rank == 0:
+                shutil.copytree('src', os.path.join(trainer.logger.log_dir, 'src_backup'))  # backup src directory
         except: pass
 
         trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=args.resume_ckpt_path)

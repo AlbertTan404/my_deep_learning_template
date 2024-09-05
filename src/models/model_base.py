@@ -43,13 +43,13 @@ class ModelBase(pl.LightningModule):
         log_dict = self.get_log_dict(batch, batch_idx, 'train')
         log_dict.update(self.extra_training_step(batch=batch, batch_idx=batch_idx))
         log_dict['lr'] = self.lr_scheduler.get_last_lr()[0]
-        self.log_dict(log_dict, sync_dist=True, prog_bar=True)
+        self.log_dict(log_dict, sync_dist=True, prog_bar=True, batch_size=self.all_config.dataloader.batch_size)
         return log_dict['train/total_loss']
 
     def validation_step(self, batch, batch_idx):
         log_dict = self.get_log_dict(batch, batch_idx, 'val')
         log_dict.update(self.extra_validation_step(batch=batch, batch_idx=batch_idx))
-        self.log_dict(log_dict, sync_dist=True, prog_bar=True)
+        self.log_dict(log_dict, sync_dist=True, prog_bar=True, batch_size=self.all_config.dataloader.batch_size)
         return log_dict['val/total_loss']
 
     def test_step(self, batch, batch_idx=None) -> Dict:

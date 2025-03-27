@@ -53,10 +53,10 @@ class ModelBase(pl.LightningModule):
         return log_dict['val/total_loss']
 
     def test_step(self, batch, batch_idx=None) -> Dict:
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in the child class.")
 
     def get_log_dict(self, batch, split, batch_idx=None) -> Dict:
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in child class.")
 
     def extra_training_step(self, batch, batch_idx=None) -> Dict:
         return {}

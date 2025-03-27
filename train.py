@@ -218,6 +218,9 @@ def main():
 
         trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=args.resume_ckpt_path)
 
+        if trainer.global_rank == 0:
+            shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
+
         # evaluation
         results = trainer.test(ckpt_path='best', dataloaders=test_dataloader)[0]  # the first dataloader
         logger.info(f'evaluation results: {results}')
@@ -227,7 +230,7 @@ def main():
     else:
         # mark log dir as trained
         if trainer.global_rank == 0:
-            shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
+            shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained' + '_tested')
 
 
 if __name__ == '__main__':

@@ -30,4 +30,4 @@ class DatasetBase(Dataset):
         return self.getitem(index=index)
 
     def getitem(self, index):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in the child class.")

@@ -2,6 +2,7 @@ import os
 import shutil
 import copy
 import argparse
+from pathlib import Path
 from omegaconf import OmegaConf, DictConfig, ListConfig
 import torch
 from torch.utils.data import DataLoader
@@ -76,6 +77,7 @@ def _preprocess_config(config, args, unknown_args):
     # set unknown args to config
     for unknown in unknown_args:
         k, v = unknown.split('=')
+        # dictionary and list are not supported so far.
         try:
             v = int(v)  # maybe int has the highest priority
         except:
@@ -111,7 +113,7 @@ def _preprocess_config(config, args, unknown_args):
     bs_per_device = total_bs // num_devices
     real_bs = bs_per_device * num_devices
     if real_bs != total_bs:
-        logger.warn(f'real batch size is {real_bs}')
+        logger.warning(f'real batch size is {real_bs}')
     config.dataloader.batch_size = bs_per_device
 
     # epoch scaling
@@ -151,6 +153,9 @@ def get_processed_args_and_config():
     config = OmegaConf.merge(config, DictConfig(dataset_config))
 
     config = _preprocess_config(config, args, unknown_args)
+
+    # merge args into config
+    config = OmegaConf.merge(config, OmegaConf.create({'args': vars(args)}))
     
     return args, config
 
@@ -160,16 +165,19 @@ def get_args():
 
     parser.add_argument(
         '--model',
+        type=str,
         default='my_model'
     )
 
     parser.add_argument(
         '--dataset',
+        type=str,
         default='my_dataset'
     )
 
     parser.add_argument(
         '--trainer',
+        type=str,
         default='default'
     )
 
@@ -181,14 +189,23 @@ def get_args():
 
     parser.add_argument(
         '--no_log',
+        type=bool,
         help='disable training log',
         action='store_true'
     )
 
     parser.add_argument(
         '--log_suffix',
+        type=str,
         help='add suffix to log dir',
         default=''
+    )
+
+    parser.add_argument(
+        '--workspace_path',
+        type=str,
+        help='assign the path of user workspace directory',
+        default='~'
     )
 
     args, unknown_args = parser.parse_known_args()
@@ -197,6 +214,7 @@ def get_args():
 
 def main():
     args, config = get_processed_args_and_config()
+
     pl.seed_everything(config.seed)
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

@@ -7,7 +7,7 @@ model:
 
   training_kwargs:
     optimizer:
-      target: torch.optim.Adam
+      target: torch.optim.AdamW
       lr: 1e-4
     scheduler: cosine_schedule_with_warmup
     warmup_steps: 1000

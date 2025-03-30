@@ -5,3 +5,6 @@ dataset:
   dataset_dir: ~/data/data
   epoch_scaling: 1
   split: 
+
+data_module:
+  target: src.datasets.my_dataset.MyDataModule

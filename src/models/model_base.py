@@ -25,6 +25,11 @@ class ModelBase(pl.LightningModule):
 
         optimizer = instantiate_from_config(kwargs.optimizer, extra_kwargs={'params': tuned_parameters})
 
+        if not hasattr(kwargs, 'scheduler') or kwargs.scheduler is None:
+            return {
+                'optimizer': optimizer
+            }
+
         if kwargs.scheduler == 'cosine_schedule_with_warmup':
             scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=kwargs.warmup_steps, num_training_steps=kwargs.num_training_steps)
         else:

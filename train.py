@@ -1,11 +1,9 @@
 import os
 import shutil
-import copy
 import argparse
 from pathlib import Path
 from omegaconf import OmegaConf, DictConfig, ListConfig
 import torch
-from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 
 from src.utils import instantiate_from_config, get_timestamp, setup_logger
@@ -20,22 +18,6 @@ def instantiate_callbacks(callback_configs: ListConfig):
         callbacks.append(instantiate_from_config(callback_cfg))
     
     return callbacks
-
-
-def get_dataloaders(config):
-    train_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'train'})
-    val_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'val'})
-    test_ds = instantiate_from_config(config.dataset, extra_kwargs={'split': 'test'})
-
-    dataloader_config = copy.copy(config.dataloader)
-    val_batch_size = dataloader_config.pop('val_batch_size', dataloader_config.batch_size)
-    train_dataloader = DataLoader(train_ds, **dataloader_config, shuffle=True, drop_last=True)
-    dataloader_config.batch_size = val_batch_size
-    val_dataloader = DataLoader(val_ds, **dataloader_config, shuffle=False, drop_last=True)
-    test_dataloader = DataLoader(test_ds, **dataloader_config, shuffle=False, drop_last=True)
-
-    return train_dataloader, val_dataloader, test_dataloader
-
 
 
 def _preprocess_config(config, args, unknown_args):
@@ -208,6 +190,13 @@ def get_args():
         default='~'
     )
 
+    parser.add_argument(
+        '--do_test',
+        type=bool,
+        help='test after training',
+        action='store_true'
+    )
+
     args, unknown_args = parser.parse_known_args()
     return args, unknown_args
 
@@ -218,9 +207,7 @@ def main():
     pl.seed_everything(config.seed)
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(config)
-    epoch_length = len(train_dataloader) // len(config.trainer.devices)
-    config.model.training_kwargs['num_training_steps'] = epoch_length * config.trainer.max_epochs
+    data_module: pl.LightningDataModule = instantiate_from_config(config.data_module, extra_kwargs={'all_config': config})
 
     model: pl.LightningModule = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
     if p := args.load_state_dict_path:
@@ -234,14 +221,15 @@ def main():
                 shutil.copytree('src', os.path.join(trainer.logger.log_dir, 'src_backup'))  # backup src directory
         except: pass
 
-        trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader, ckpt_path=args.resume_ckpt_path)
+        trainer.fit(model=model, datamodule=data_module, ckpt_path=args.resume_ckpt_path)
 
         if trainer.global_rank == 0:
             shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
 
-        # evaluation
-        results = trainer.test(ckpt_path='best', dataloaders=test_dataloader)[0]  # the first dataloader
-        logger.info(f'evaluation results: {results}')
+        if args.do_test:
+            # evaluation
+            results = trainer.test(ckpt_path='best')[0]  # the first dataloader
+            logger.info(f'evaluation results: {results}')
 
     except Exception as e:
         raise e

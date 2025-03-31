@@ -48,28 +48,34 @@ class DataModuleBase(pl.LightningDataModule):
         self.data_module_kwargs = kwargs
         self.all_config = all_config
 
-    def get_dataloaders(self):
-        train_ds = instantiate_from_config(self.all_config.dataset, extra_kwargs={'split': 'train'})
-        val_ds = instantiate_from_config(self.all_config.dataset, extra_kwargs={'split': 'val'})
+    def get_dataloaders(self, stage):
+        if stage == 'fit':
+            train_ds = instantiate_from_config(self.all_config.dataset, extra_kwargs={'split': 'train'})
+            val_ds = instantiate_from_config(self.all_config.dataset, extra_kwargs={'split': 'val'})
 
-        dataloader_config = copy.copy(self.all_config.dataloader)
-        val_batch_size = dataloader_config.pop('val_batch_size', dataloader_config.batch_size)
-        train_dataloader = DataLoader(train_ds, **dataloader_config, shuffle=True, drop_last=True)
-        dataloader_config.batch_size = val_batch_size
-        val_dataloader = DataLoader(val_ds, **dataloader_config, shuffle=False, drop_last=True)
+            dataloader_config = copy.deepcopy(self.all_config.dataloader)
 
-        try:
+            train_dataloader = DataLoader(train_ds, **dataloader_config, shuffle=True, drop_last=True)
+            val_batch_size = dataloader_config.pop('val_batch_size', dataloader_config.batch_size)
+            dataloader_config.batch_size = val_batch_size
+            val_dataloader = DataLoader(val_ds, **dataloader_config, shuffle=False, drop_last=True)
+            return train_dataloader, val_dataloader
+
+        elif stage == 'test':
+            dataloader_config = copy.deepcopy(self.all_config.dataloader)
+            val_batch_size = dataloader_config.pop('val_batch_size', dataloader_config.batch_size)
+            dataloader_config.batch_size = val_batch_size
             test_ds = instantiate_from_config(self.all_config.dataset, extra_kwargs={'split': 'test'})
             test_dataloader = DataLoader(test_ds, **dataloader_config, shuffle=False, drop_last=True)
-        except:
-            test_dataloader = None
-
-        return train_dataloader, val_dataloader, test_dataloader
+            return test_dataloader
 
     def setup(self, stage):
-        self._train_dataloader, self._val_dataloader, self._test_dataloader = self.get_dataloaders()
-        epoch_length = len(self.train_dataloader()) // len(self.all_config.trainer.devices)
-        self.all_config.model.training_kwargs['num_training_steps'] = epoch_length * self.all_config.trainer.max_epochs
+        if stage == 'fit':
+            self._train_dataloader, self._val_dataloader = self.get_dataloaders(stage='fit')
+            epoch_length = len(self.train_dataloader()) // len(self.all_config.trainer.devices)
+            self.all_config.model.training_kwargs['num_training_steps'] = epoch_length * self.all_config.trainer.max_epochs
+        elif stage == 'test':
+            self._test_dataloader = self.get_dataloaders(stage='test')
     
     def train_dataloader(self):
         return self._train_dataloader

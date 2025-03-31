@@ -237,7 +237,7 @@ def main():
 
         if args.do_test:
             # evaluation
-            results = trainer.test(ckpt_path='best')[0]  # the first dataloader
+            results = trainer.test(ckpt_path='best', datamodule=data_module)[0]  # the first dataloader
             logger.info(f'evaluation results: {results}')
 
         if trainer.global_rank == 0:

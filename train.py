@@ -148,13 +148,13 @@ def get_args():
     parser.add_argument(
         '--model',
         type=str,
-        default='my_model'
+        default='toy_model'
     )
 
     parser.add_argument(
         '--dataset',
         type=str,
-        default='my_dataset'
+        default='toy_dataset'
     )
 
     parser.add_argument(
@@ -171,7 +171,6 @@ def get_args():
 
     parser.add_argument(
         '--no_log',
-        type=bool,
         help='disable training log',
         action='store_true'
     )
@@ -184,6 +183,20 @@ def get_args():
     )
 
     parser.add_argument(
+        '--resume_ckpt_path',
+        type=str,
+        help='resume training from ckpt',
+        default=None
+    )
+
+    parser.add_argument(
+        '--load_ckpt_path',
+        type=str,
+        help='load ckpt as initialization',
+        default=None
+    )
+
+    parser.add_argument(
         '--workspace_path',
         type=str,
         help='assign the path of user workspace directory',
@@ -192,7 +205,6 @@ def get_args():
 
     parser.add_argument(
         '--do_test',
-        type=bool,
         help='test after training',
         action='store_true'
     )
@@ -210,7 +222,7 @@ def main():
     data_module: pl.LightningDataModule = instantiate_from_config(config.data_module, extra_kwargs={'all_config': config})
 
     model: pl.LightningModule = instantiate_from_config(config.model, extra_kwargs={"all_config": config})
-    if p := args.load_state_dict_path:
+    if p := args.load_ckpt_path:
         model.load_state_dict(torch.load(p, map_location='cpu')['state_dict'])
 
     trainer: pl.Trainer = instantiate_from_config(config.trainer, extra_kwargs={'callbacks': instantiate_callbacks(config.callbacks)})
@@ -223,13 +235,13 @@ def main():
 
         trainer.fit(model=model, datamodule=data_module, ckpt_path=args.resume_ckpt_path)
 
-        if trainer.global_rank == 0:
-            shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
-
         if args.do_test:
             # evaluation
             results = trainer.test(ckpt_path='best')[0]  # the first dataloader
             logger.info(f'evaluation results: {results}')
+
+        if trainer.global_rank == 0:
+            shutil.move(trainer.logger.log_dir, trainer.logger.log_dir + '_trained')
 
     except Exception as e:
         raise e

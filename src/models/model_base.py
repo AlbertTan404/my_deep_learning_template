@@ -20,7 +20,7 @@ class ModelBase(pl.LightningModule):
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        kwargs = self.training_kwargs
+        kwargs = self.all_config.model.training_kwargs
         tuned_parameters = [p for p in self.parameters() if p.requires_grad]
 
         optimizer = instantiate_from_config(kwargs.optimizer, extra_kwargs={'params': tuned_parameters})
@@ -45,15 +45,16 @@ class ModelBase(pl.LightningModule):
         }
 
     def training_step(self, batch, batch_idx):
-        log_dict = self.get_log_dict(batch, batch_idx, 'train')
+        log_dict = self.get_log_dict(batch, 'train', batch_idx)
         log_dict.update(self.extra_training_step(batch=batch, batch_idx=batch_idx))
-        log_dict['lr'] = self.lr_scheduler.get_last_lr()[0]
         self.log_dict(log_dict, sync_dist=True, prog_bar=True, batch_size=self.all_config.dataloader.batch_size)
         return log_dict['train/total_loss']
 
     def validation_step(self, batch, batch_idx):
-        log_dict = self.get_log_dict(batch, batch_idx, 'val')
+        log_dict = self.get_log_dict(batch, 'val', batch_idx)
         log_dict.update(self.extra_validation_step(batch=batch, batch_idx=batch_idx))
+        if 'monitor' not in log_dict.keys():
+            log_dict['monitor'] = - log_dict['val/total_loss']
         self.log_dict(log_dict, sync_dist=True, prog_bar=True, batch_size=self.all_config.dataloader.batch_size)
         return log_dict['val/total_loss']
 

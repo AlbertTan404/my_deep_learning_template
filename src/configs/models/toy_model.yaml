@@ -1,9 +1,9 @@
 seed: 42
 
 model:
-  target: src.models.vanilla.VanillaModel
+  target: src.models.toy_model.ToyModel
   model_kwargs:
-    hidden_size: 768
+    key: value
 
   training_kwargs:
     optimizer:
@@ -13,7 +13,7 @@ model:
     warmup_steps: 1000
 
 trainer:
-  max_epochs: 1000
+  max_epochs: 5
 
 dataloader:
   batch_size: 32

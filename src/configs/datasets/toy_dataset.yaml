@@ -1,0 +1,16 @@
+dataset_dir: 
+
+dataset:
+  target: src.datasets.toy_dataset.ToyDataset
+
+  # kwargs:
+  dataset_dir: ~/data
+  epoch_scaling: 1
+  tiny_dataset: False
+  split: 
+
+data_module:
+  target: src.datasets.toy_dataset.ToyDataModule
+  
+  # kwargs:
+  key: value
